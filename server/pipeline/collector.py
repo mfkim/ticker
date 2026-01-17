@@ -182,6 +182,48 @@ class StockCollector:
         # 2. 종목 정보 동기화
         symbols = self.sync_metadata()
 
+        # ---------------------------------------------------------
+        # 📊 Phase 1.5: 미국 시장 지수 수집 (S&P500, Dow, Nasdaq)
+        # ---------------------------------------------------------
+        print("\n" + "=" * 50)
+        print("📊 Phase 1.5: 주요 시장 지수(Indices) 수집")
+        print("=" * 50)
+
+        # 수집할 지수 목록 정의
+        TARGET_INDICES = [
+            {'symbol': '^GSPC', 'name': 'S&P 500'},
+            {'symbol': '^DJI', 'name': 'Dow Jones 30'},
+            {'symbol': '^IXIC', 'name': 'NASDAQ Composite'}
+        ]
+
+        session = self._get_session()
+        try:
+            for idx in TARGET_INDICES:
+                symbol = idx['symbol']
+                name = idx['name']
+
+                # 지수용 Ticker 생성/업데이트
+                idx_ticker = Ticker(
+                    symbol=symbol,
+                    name=name,
+                    sector="Index",
+                    industry="Market",
+                    market_cap=0,
+                    is_active=False
+                )
+                session.merge(idx_ticker)
+                session.commit()
+
+                # 주가 수집 실행
+                print(f"   Processing Index: {name} ({symbol})...", end='\r', flush=True)
+                self.process_prices(symbol)
+                print(f"✅ 지수 수집 완료: {name:<20}       ")
+
+        except Exception as e:
+            print(f"❌ 지수 수집 실패: {e}")
+        finally:
+            session.close()
+
         if not symbols:
             print("❌ 종목 리스트를 가져오지 못해 종료합니다.")
             return
@@ -213,4 +255,4 @@ class StockCollector:
 if __name__ == "__main__":
     collector = StockCollector()
 
-    collector.run(limit=None)
+    collector.run(limit=1)
