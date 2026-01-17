@@ -1,103 +1,113 @@
 import streamlit as st
 import requests
 import pandas as pd
-import plotly.graph_objects as go
 
-# 1. 페이지 기본 설정
-st.set_page_config(
-    page_title="Ticker",
-    page_icon="📈",
-    layout="wide"
-)
+st.set_page_config(page_title="Ticker", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 제목 및 사이드바
-st.title("📈 Ticker: 주식 데이터 분석 대시보드")
-st.sidebar.header("검색 옵션")
-ticker = st.sidebar.text_input("종목 코드 입력", value="NVDA")
+st.markdown("""
+<style>
+    /* 전체 배경 */
+    .stApp { background-color: #0E1117; }
+
+    /* 헤더 */
+    h1 { color: white; font-weight: 800; letter-spacing: -1px; margin-bottom: 0px; }
+    .caption { color: #888; font-size: 16px; margin-bottom: 30px; }
+
+    /* 카드 컨테이너 */
+    .stock-card {
+        background-color: #1A1A1A;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        transition: transform 0.2s, border-color 0.2s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    /* 호버 효과 */
+    .stock-card:hover {
+        transform: translateY(-3px);
+        border-color: #555;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+    }
+
+    /* 텍스트 */
+    .symbol { font-size: 20px; font-weight: 800; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; }
+    .name { font-size: 13px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; margin-bottom: 12px; }
+    .price-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    .price { font-size: 24px; font-weight: 700; color: #EEEEEE; }
+
+    /* 등락률 배지 */
+    .badge {
+        font-size: 14px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+    .up-bg { background-color: rgba(0, 200, 5, 0.15); color: #00FF41; border: 1px solid rgba(0, 200, 5, 0.3); }
+    .down-bg { background-color: rgba(255, 80, 0, 0.15); color: #FF5000; border: 1px solid rgba(255, 80, 0, 0.3); }
+
+    /* 기본 여백 제거 */
+    .block-container { padding-top: 2rem; padding-bottom: 2rem; }
+</style>
+""", unsafe_allow_html=True)
 
 
-# 3. API 서버에서 데이터 가져오기 함수
-def fetch_stock_data(ticker_symbol):
+# API
+@st.cache_data(ttl=60)
+def fetch_ranking(limit=100):
     try:
-        # FastAPI 서버 주소 (local)
-        url = f"http://127.0.0.1:8000/api/v1/stocks/{ticker_symbol}"
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            st.error(f"데이터를 가져올 수 없습니다. (Status: {response.status_code})")
-            return None
-    except Exception as e:
-        st.error(f"서버 연결 실패: {e}")
-        return None
+        url = f"http://127.0.0.1:8000/api/v1/stocks/ranking?limit={limit}"
+        resp = requests.get(url, timeout=3)
+        if resp.status_code == 200:
+            return pd.DataFrame(resp.json())
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 
-# 4. Main Logic
-if st.button("조회하기") or ticker:
-    data = fetch_stock_data(ticker)
+st.title("S&P 500")
+st.markdown("<div class='caption'>Top 100 Companies by Market Capitalization</div>",
+            unsafe_allow_html=True)
 
-    if data:
-        # JSON -> DataFrame
-        df = pd.DataFrame(data)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.set_index('Date')
+df = fetch_ranking(limit=100)
 
-        # 최신 데이터
-        latest = df.iloc[0]
-        prev = df.iloc[1]
+if not df.empty:
+    cols_per_row = 5
+    rows = [st.columns(cols_per_row) for _ in range((len(df) // cols_per_row) + 1)]
 
-        # --- 지표 카드 (Metric) 배치 ---
-        col1, col2, col3 = st.columns(3)
+    for index, row in df.iterrows():
+        col_idx = index % cols_per_row
+        row_idx = index // cols_per_row
+        current_col = rows[row_idx][col_idx]
 
-        # 전일 대비 변동 계산
-        diff = latest['Close'] - prev['Close']
-        diff_pct = (diff / prev['Close']) * 100
+        with current_col:
+            symbol = row['Symbol']
+            name = row['Name']
+            price = row['Close']
+            pct = row['ChangeRate'] if pd.notnull(row['ChangeRate']) else 0.0
 
-        with col1:
-            st.metric(label="현재 종가 (Close)",
-                      value=f"${latest['Close']:.2f}",
-                      delta=f"{diff:.2f} ({diff_pct:.2f}%)")
-        with col2:
-            st.metric(label="20일 이동평균 (MA20)",
-                      value=f"${latest['MA_20']:.2f}")
-        with col3:
-            rsi = latest['RSI_14']
-            state = "과매수 🔥" if rsi >= 70 else "과매도 🧊" if rsi <= 30 else "중립 😐"
-            st.metric(label="RSI (14일)",
-                      value=f"{rsi:.2f}",
-                      delta=state, delta_color="off")
+            if pct >= 0:
+                badge_class = "up-bg"
+                sign = "+"
+            else:
+                badge_class = "down-bg"
+                sign = ""
 
-        st.divider()
+            st.markdown(f"""
+            <div class="stock-card">
+                <div class="symbol">
+                    {symbol}
+                </div>
+                <div class="name" title="{name}">{name}</div>
+                <div class="price-row">
+                    <div class="price">${price:,.2f}</div>
+                    <div class="badge {badge_class}">
+                        {sign}{pct:.2f}%
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # --- 차트 그리기 ---
-        st.subheader(f"📊 {ticker} 주가 추이 (최근 100일)")
-
-        # 캔들차트 + 이동평균선
-        fig = go.Figure()
-
-        # 라인 차트 (종가)
-        fig.add_trace(go.Scatter(
-            x=df.index, y=df['Close'],
-            mode='lines', name='Close Price',
-            line=dict(color='#00F0FF', width=2)
-        ))
-
-        # 라인 차트 (MA20)
-        fig.add_trace(go.Scatter(
-            x=df.index, y=df['MA_20'],
-            mode='lines', name='MA 20',
-            line=dict(color='#FFA500', width=1, dash='dot')
-        ))
-
-        fig.update_layout(
-            template="plotly_dark",
-            xaxis_title="날짜",
-            yaxis_title="가격 (USD)",
-            height=500
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-        with st.expander("💾 원본 데이터 보기"):
-            st.dataframe(df)
+else:
+    st.error("⚠️ 서버 연결 실패. 서버가 실행 중인지 확인해주세요.")
