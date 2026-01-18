@@ -1,6 +1,8 @@
+import {Routes, Route} from "react-router-dom";
 import Header from "./components/Header";
 import StockDashboard from "./components/StockDashboard";
-import MarketBanner from "./components/MarketBanner.tsx";
+import MarketBanner from "./components/MarketBanner";
+import StockDetail from "./pages/StockDetail";
 
 function App() {
   return (
@@ -9,8 +11,18 @@ function App() {
       <Header/>
 
       <main className="max-w-[1600px] mx-auto px-6 py-8">
-        <MarketBanner />
-        <StockDashboard/>
+        <Routes>
+          {/* 메인 페이지 */}
+          <Route path="/" element={
+            <>
+              <MarketBanner/>
+              <StockDashboard/>
+            </>
+          }/>
+
+          {/* 상세 페이지 */}
+          <Route path="/stock/:symbol" element={<StockDetail/>}/>
+        </Routes>
       </main>
     </div>
   )

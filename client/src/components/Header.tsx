@@ -1,3 +1,5 @@
+import {Link} from "react-router-dom";
+
 export default function Header() {
   return (
     <header
@@ -5,7 +7,7 @@ export default function Header() {
       <div className="flex h-16 items-center justify-between px-6 max-w-[1600px] mx-auto">
 
         {/* Logo */}
-        <div className="flex items-center gap-2 cursor-pointer group">
+        <Link to="/" className="flex items-center gap-2 cursor-pointer group">
           <svg
             className="w-8 h-8 text-rh-green transition-transform group-hover:scale-110"
             viewBox="0 0 24 24"
@@ -17,7 +19,7 @@ export default function Header() {
           <span className="text-xl font-black tracking-tighter text-rh-text">
               TICKER
             </span>
-        </div>
+        </Link>
 
         {/* Search Bar (Desktop Only) */}
         <div className="hidden md:flex flex-1 max-w-md mx-8">

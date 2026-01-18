@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from server.core.database import get_db
-from server.api.schemas import StockData, StockRanking
+from server.api.schemas import StockData, StockRanking, StockDetailResponse, TickerInfo
 from typing import List
 
 router = APIRouter()
@@ -78,30 +78,44 @@ def get_stock_ranking(limit: int = 100, db: Session = Depends(get_db)):
 # =========================================================================
 # 3. 특정 종목 상세 데이터 조회 API
 # =========================================================================
-@router.get("/stocks/{ticker}", response_model=List[StockData])
+@router.get("/stocks/{ticker}", response_model=StockDetailResponse)
 def get_stock_data(ticker: str, db: Session = Depends(get_db)):
     """
-    [기능] 특정 종목의 1년치 주가 및 보조지표 조회
-    [용도] 차트 및 상세 분석용
+    [기능] 특정 종목의 기업 정보와 1년치 주가를 한 번에 조회
     """
     try:
-        query = text("""
-                     SELECT
-                         date as "Date", open as "Open", close as "Close", volume as "Volume", change_rate as "ChangeRate", ma_20 as "MA_20", ma_50 as "MA_50", ma_200 as "MA_200", rsi_14 as "RSI_14"
-                     FROM prices
-                     WHERE ticker_symbol = :ticker
-                     ORDER BY date DESC
-                         LIMIT 365
-                     """)
+        # 1. 기업 정보 조회 (Tickers 테이블)
+        # 쿼리 결과 컬럼명을 Pydantic 모델(TickerInfo)과 일치시킴
+        info_query = text("""
+                          SELECT symbol     as "Symbol",
+                                 name       as "Name",
+                                 sector     as "Sector",
+                                 industry   as "Industry",
+                                 market_cap as "MarketCap"
+                          FROM tickers
+                          WHERE symbol = :ticker
+                          """)
+        info_result = db.execute(info_query, {"ticker": ticker}).mappings().first()
 
-        result = db.execute(query, {"ticker": ticker})
-        data = result.mappings().all()
+        if not info_result:
+            raise HTTPException(status_code=404, detail="종목 정보를 찾을 수 없습니다.")
 
-        if not data:
-            print(f"⚠️ [API Warning] 데이터 없음: {ticker}")
-            return []
+        # 2. 주가 데이터 조회 (Prices 테이블)
+        price_query = text("""
+                           SELECT
+                               date as "Date", open as "Open", close as "Close", volume as "Volume", change_rate as "ChangeRate", ma_20 as "MA_20", ma_50 as "MA_50", ma_200 as "MA_200", rsi_14 as "RSI_14"
+                           FROM prices
+                           WHERE ticker_symbol = :ticker
+                           ORDER BY date DESC
+                               LIMIT 365
+                           """)
+        price_result = db.execute(price_query, {"ticker": ticker}).mappings().all()
 
-        return data
+        # 3. 통합 반환
+        return {
+            "info": info_result,
+            "prices": price_result
+        }
 
     except Exception as e:
         print(f"❌ [API Error] 상세 조회 실패 ({ticker}): {e}")

@@ -1,10 +1,13 @@
 import type {StockRanking} from "../types";
+import {useNavigate} from "react-router-dom";
 
 interface Props {
   stock: StockRanking;
 }
 
 export default function StockCard({stock}: Props) {
+  const navigate = useNavigate();
+
   const changeRate = stock.ChangeRate ?? 0;
   const isUp = changeRate >= 0;
 
@@ -12,9 +15,15 @@ export default function StockCard({stock}: Props) {
   const bgBadge = isUp ? "bg-rh-green/10" : "bg-rh-red/10";
   const arrow = isUp ? "▲" : "▼";
 
+  const handleClick = () => {
+    navigate(`/stock/${stock.Symbol}`, {state: {name: stock.Name}});
+  };
+
   return (
     <div
-      className="group relative flex flex-col justify-between p-5 bg-rh-dark border border-rh-gray rounded-xl transition-all duration-300 hover:-translate-y-1 hover:border-rh-green/50 hover:shadow-lg hover:shadow-rh-green/10 cursor-default">
+      onClick={handleClick}
+      className="group relative flex flex-col justify-between p-5 bg-rh-dark border border-rh-gray rounded-xl transition-all duration-300 hover:-translate-y-1 hover:border-rh-green/50 hover:shadow-lg hover:shadow-rh-green/10 cursor-pointer"
+    >
 
       {/* 상단: 심볼 및 회사명 */}
       <div className="mb-4">
