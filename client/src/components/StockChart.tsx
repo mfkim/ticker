@@ -1,44 +1,50 @@
-import {AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer} from 'recharts';
-
-interface StockData {
-  Date: string;
-  Close: number;
-}
+import {
+  ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine
+} from 'recharts';
 
 interface Props {
-  data: StockData[];
+  data: any[];
   color: string;
 }
 
 export default function StockChart({data, color}: Props) {
-  // 데이터 순서가 최신순이면 뒤집어줘야 함 (차트는 과거->현재 순)
-  const chartData = [...data].reverse();
-
   return (
-    <div className="h-[400px] w-full mt-4">
+    <div className="h-100 w-full mt-4">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData}>
+        <ComposedChart data={data}>
           <defs>
             <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
               <stop offset="95%" stopColor={color} stopOpacity={0}/>
             </linearGradient>
+            <pattern id="predictionPattern" patternUnits="userSpaceOnUse" width="4" height="4">
+              <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" stroke={color} strokeWidth="1" opacity={0.2}/>
+            </pattern>
           </defs>
 
-          <XAxis
-            dataKey="Date"
-            hide={true} // X축 날짜 숨김 (심플함 추구)
-          />
-          <YAxis
-            domain={['auto', 'auto']} // 값의 범위에 맞춰 차트 높이 자동 조절
-            hide={true} // Y축 가격 숨김
-          />
+          <XAxis dataKey="Date" hide={true}/>
+          <YAxis domain={['auto', 'auto']} hide={true}/>
 
           <Tooltip
             contentStyle={{backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '8px'}}
             itemStyle={{color: '#fff'}}
+            formatter={(value: any, name: any) => {
+              if (name === "Close") return [`$${Number(value).toFixed(2)}`, "Price"];
+              if (name === "PredictedClose") return [`$${Number(value).toFixed(2)}`, "AI Forecast"];
+              if (name === "UpperBound") return [`$${Number(value).toFixed(2)}`, "Max Range"];
+              if (name === "LowerBound") return [`$${Number(value).toFixed(2)}`, "Min Range"];
+              return [`$${value}`, name];
+            }}
             labelStyle={{color: '#888', marginBottom: '4px'}}
-            formatter={(value: any) => [`$${value.toFixed(2)}`, 'Price']}
+          />
+
+          <Area
+            type="monotone"
+            dataKey="UpperBound"
+            baseLine={0}
+            stroke="none"
+            fill={color}
+            fillOpacity={0.05}
           />
 
           <Area
@@ -46,10 +52,25 @@ export default function StockChart({data, color}: Props) {
             dataKey="Close"
             stroke={color}
             strokeWidth={2}
-            fillOpacity={1}
             fill="url(#colorGradient)"
           />
-        </AreaChart>
+
+          <Line
+            type="monotone"
+            dataKey="PredictedClose"
+            stroke={color}
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={{r: 2, fill: color}}
+            activeDot={{r: 6}}
+          />
+
+          {data.find(d => d.PredictedClose) && (
+            <ReferenceLine x={data.find(d => d.PredictedClose)?.Date} stroke="#555" strokeDasharray="3 3"
+                           label={{position: 'top', value: 'AI Forecast', fill: '#888', fontSize: 12}}/>
+          )}
+
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

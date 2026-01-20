@@ -30,3 +30,10 @@ export interface StockDetailResponse {
   info: TickerInfo;
   prices: StockPrice[];
 }
+
+export interface PredictionData {
+  Date: string;
+  PredictedClose: number;
+  LowerBound: number;
+  UpperBound: number;
+}

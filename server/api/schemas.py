@@ -46,3 +46,14 @@ class StockData(BaseModel):
 class StockDetailResponse(BaseModel):
     info: TickerInfo
     prices: List[StockData]
+
+
+# 예측 데이터 스키마
+class PredictionData(BaseModel):
+    Date: str
+    PredictedClose: float
+    LowerBound: float
+    UpperBound: float
+
+    class Config:
+        from_attributes = True
